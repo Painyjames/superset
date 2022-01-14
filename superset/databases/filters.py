@@ -22,13 +22,18 @@ from sqlalchemy.orm import Query
 from superset import security_manager
 from superset.views.base import BaseFilter
 
-
 class DatabaseFilter(BaseFilter):
     # TODO(bogdan): consider caching.
     def schema_access_databases(self) -> Set[str]:  # noqa pylint: disable=no-self-use
         return {
-            security_manager.unpack_schema_perm(vm)[0]
+            security_manager.unpack_perm(vm)[0]
             for vm in security_manager.user_view_menu_names("schema_access")
+        }
+
+    def datasource_access_databases(self) -> Set[str]:  # noqa pylint: disable=no-self-use
+        return {
+            security_manager.unpack_perm(vm)[0]
+            for vm in security_manager.user_view_menu_names("datasource_access")
         }
 
     def apply(self, query: Query, value: Any) -> Query:
@@ -37,9 +42,13 @@ class DatabaseFilter(BaseFilter):
         database_perms = security_manager.user_view_menu_names("database_access")
         # TODO(bogdan): consider adding datasource access here as well.
         schema_access_databases = self.schema_access_databases()
+
+        datasources = self.datasource_access_databases()
+
         return query.filter(
             or_(
                 self.model.perm.in_(database_perms),
                 self.model.database_name.in_(schema_access_databases),
+                self.model.database_name.in_(datasources)
             )
         )
